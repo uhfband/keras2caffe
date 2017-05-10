@@ -147,6 +147,9 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
             caffe_net[name] = L.Pooling(caffe_net[outputs[bottom]], kernel_size=pool_size[0], 
                 stride=strides[0], pad=pad, pool=pool)
         
+        elif layer_type=='Dropout':
+            caffe_net[name] = L.Dropout(caffe_net[outputs[bottom]], dropout_param=dict(dropout_ratio=config['rate']))
+        
         #TODO
         
         elif layer_type=='GlobalAveragePooling2D':
