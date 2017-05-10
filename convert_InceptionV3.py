@@ -27,17 +27,13 @@ data = np.array(img, dtype=np.float32)
 data = data.transpose((2, 0, 1))
 data.shape = (1,) + data.shape
 
-data -= 128
 data /= 128
+data -= 1.0
 
 net.blobs['data'].data[...] = data
 
 out = net.forward()
 pred = out['predictions']
-
-#softmax function
-pred = np.exp(pred - np.max(pred))
-pred /= pred.sum()
 
 prob = np.max(pred)
 cls = pred.argmax()
