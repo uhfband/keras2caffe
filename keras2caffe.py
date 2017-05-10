@@ -103,13 +103,16 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
                 net_params[name] = (np.array(blobs[0]).transpose(1, 0), np.array(blobs[1]))
             else:
                 net_params[name] = (blobs[0])
+                
+            if config['activation']=='softmax':
+            	caffe_net['softmax'] = L.Softmax(caffe_net[name], in_place=True)
         
         elif layer_type=='Activation':
             if config['activation']!='relu':
                 raise Exception('Unsupported activation')
             caffe_net[name] = L.ReLU(caffe_net[outputs[bottom]], in_place=True)
             
-        elif layer_type=='Concatenate':
+        elif layer_type=='Concatenate' or layer_type=='Merge':
             layers = []
             for i in layer.input:
                 layers.append(caffe_net[outputs[i.name]])
