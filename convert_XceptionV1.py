@@ -2,7 +2,8 @@ import caffe
 import cv2
 import numpy as np
 
-from keras.applications.inception_v3 import InceptionV3
+from keras.applications.xception import Xception
+import keras
 
 import keras2caffe
 
@@ -10,21 +11,24 @@ import keras2caffe
 import tensorflow as tf
 from keras.backend.tensorflow_backend import set_session
 config = tf.ConfigProto()
-config.gpu_options.per_process_gpu_memory_fraction = 0.5
+config.gpu_options.per_process_gpu_memory_fraction = 0.4
 set_session(tf.Session(config=config))
 
+caffe.set_mode_gpu()
 
 #converting
 
-keras_model = InceptionV3(input_shape=(299, 299, 3), weights='imagenet', include_top=True)
+keras_model = Xception(input_shape=(299, 299, 3),include_top=True, weights='imagenet')
 
-keras2caffe.convert(keras_model, 'deploy.prototxt', 'InceptionV3.caffemodel')
 
+caffe_proto='XceptionV1.prototxt'
+caffe_weights='XceptionV1.caffemodel'
+
+keras2caffe.convert(keras_model, caffe_proto, caffe_weights)
 
 #testing the model
 
-caffe.set_mode_gpu()
-net  = caffe.Net('deploy.prototxt', 'InceptionV3.caffemodel', caffe.TEST)
+net  = caffe.Net(caffe_proto, caffe_weights, caffe.TEST)
 
 img = cv2.imread('bear.jpg')
 img = cv2.resize(img, (299, 299))

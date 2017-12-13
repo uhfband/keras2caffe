@@ -1,5 +1,9 @@
-# Keras to Caffe model converter tool
+# Keras to Caffe model converter
 
-Early stage work, has been tested only with Inception V3. Requires Caffe 1.0 and Keras 2 (with TF).
+This tool tested with Caffe 1.0, Keras 2.1.2 and TensorFlow 1.4.0
+
+Working conversion examples:
+- Inception V3
+- Xception V1
 
 
