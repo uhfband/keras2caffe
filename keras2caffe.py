@@ -1,6 +1,7 @@
 import caffe
 from caffe import layers as L, params as P
 
+import math
 import numpy as np
 
 
@@ -24,7 +25,6 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
         blobs = layer.get_weights()
         blobs_num = len(blobs)
         
-        
         if type(layer.output)==list:
             raise Exception('Layers with multiply outputs are not supported')
         else: 
@@ -33,7 +33,6 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
         if type(layer.input)!=list:
             bottom = layer.input.name
             
-        
         if layer_type=='InputLayer':
             name = 'data'
             caffe_net[name] = L.Layer()
@@ -41,63 +40,140 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
             input_str = 'input: {}\ninput_dim: {}\ninput_dim: {}\ninput_dim: {}\ninput_dim: {}'.format('"' + name + '"',
                 1, input_shape[3], input_shape[1], input_shape[2])
             
-        
         elif layer_type=='Conv2D' or layer_type=='Convolution2D':
+            
             strides = config['strides']
             kernel_size = config['kernel_size']
-            filters = config['filters']
             padding = config['padding']
-            use_bias = config['use_bias']
             
-            blobs[0] = np.array(blobs[0]).transpose(3,2,0,1)
-            
-            param = dict(bias_term = use_bias)
+            kwargs = { 'num_output': config['filters'] }
             
             if kernel_size[0]==kernel_size[1]:
-                pad=0
-                if padding=='same':
-                    pad=kernel_size[0]/2
-                caffe_net[name] = L.Convolution(caffe_net[outputs[bottom]], num_output=filters, 
-                    kernel_size=kernel_size[0], pad=pad, stride=strides[0], convolution_param=param)
+            	kwargs['kernel_size']=kernel_size[0]
             else:
-                pad_h = pad_w = 0
-                if padding=='same':
-                    pad_h = kernel_size[0]/2
-                    pad_w = kernel_size[1]/2
-                caffe_net[name] = L.Convolution(caffe_net[outputs[bottom]], num_output=filters, 
-                    kernel_h=kernel_size[0], kernel_w=kernel_size[1], pad_h=pad_h, pad_w=pad_w, stride=strides[0], convolution_param=param)
+            	kwargs['kernel_h']=kernel_size[0]
+            	kwargs['kernel_w']=kernel_size[1]
             
+            if strides[0]==strides[1]:
+            	kwargs['stride']=strides[0]
+            else:
+            	kwargs['stride_h']=strides[0]
+            	kwargs['stride_w']=strides[1]
+            
+            if not config['use_bias']:
+            	kwargs['bias_term'] = False
+            	#kwargs['param']=[dict(lr_mult=0)]
+            else:
+                #kwargs['param']=[dict(lr_mult=0), dict(lr_mult=0)]
+                pass
+            
+            if padding=='same':
+            	if kernel_size[0]==kernel_size[1]:
+            		kwargs['pad'] = kernel_size[0]/2
+            		#kwargs['pad'] = kernel_size[0]/(strides[0]*2)
+            	else:
+            		kwargs['pad_h'] = kernel_size[0]/2
+            		kwargs['pad_w'] = kernel_size[1]/2
+            		#kwargs['pad_h'] = kernel_size[0]/(strides[0]*2)
+            		#kwargs['pad_w'] = kernel_size[1]/(strides[1]*2)
+            
+            caffe_net[name] = L.Convolution(caffe_net[outputs[bottom]], **kwargs)
+            
+            blobs[0] = np.array(blobs[0]).transpose(3,2,0,1)
             net_params[name] = blobs
+        
+        elif layer_type=='SeparableConv2D':
             
+            strides = config['strides']
+            kernel_size = config['kernel_size']
+            padding = config['padding']
+            
+            kwargs = { 'num_output': layer.input_shape[3] }
+            
+            if kernel_size[0]==kernel_size[1]:
+            	kwargs['kernel_size']=kernel_size[0]
+            else:
+            	kwargs['kernel_h']=kernel_size[0]
+            	kwargs['kernel_w']=kernel_size[1]
+            
+            if strides[0]==strides[1]:
+            	kwargs['stride']=strides[0]
+            else:
+            	kwargs['stride_h']=strides[0]
+            	kwargs['stride_w']=strides[1]
+            
+            if not config['use_bias']:
+            	kwargs['bias_term'] = False
+            	#kwargs['param']=[dict(lr_mult=0)]
+            else:
+                #kwargs['param']=[dict(lr_mult=0), dict(lr_mult=0)]
+                pass
+            
+            if padding=='same':
+            	if kernel_size[0]==kernel_size[1]:
+            		kwargs['pad'] = kernel_size[0]/2
+            		#kwargs['pad'] = kernel_size[0]/(strides[0]*2)
+            	else:
+            		kwargs['pad_h'] = kernel_size[0]/2
+            		kwargs['pad_w'] = kernel_size[1]/2
+            		#kwargs['pad_h'] = kernel_size[0]/(strides[0]*2)
+            		#kwargs['pad_w'] = kernel_size[1]/(strides[1]*2)
+            
+            kwargs['group'] = layer.input_shape[3]
+            
+            caffe_net[name] = L.Convolution(caffe_net[outputs[bottom]], **kwargs)
+            blob = np.array(blobs[0]).transpose(2,3,0,1)
+            blob.shape = (1,) + blob.shape
+            net_params[name] = blob
+            
+            name2 = name+'_'
+            
+            kwargs = { 'num_output':  config['filters'], 'kernel_size': 1, 'bias_term': False}
+            caffe_net[name2] = L.Convolution(caffe_net[name], **kwargs)
+            
+            blob2 = np.array(blobs[1]).transpose(3,2,0,1)
+            blob2.shape = (1,) + blob2.shape
+            net_params[name2] = blob2
+            name = name2
+        
         elif layer_type=='BatchNormalization':
-            caffe_net[name] = L.BatchNorm(caffe_net[outputs[bottom]], in_place=True)
+            
+            param = dict()
             
             variance = np.array(blobs[-1])
             mean = np.array(blobs[-2])
             
-            param = dict()
-            
             if config['scale']:
-                gamma = np.array(blobs[-3])
+                gamma = np.array(blobs[0])
+                sparam=[dict(lr_mult=1), dict(lr_mult=1)]
             else:
                 gamma = np.ones(mean.shape, dtype=np.float32)
+                #sparam=[dict(lr_mult=0, decay_mult=0), dict(lr_mult=1, decay_mult=1)]
+                sparam=[dict(lr_mult=0), dict(lr_mult=1)]
+                #sparam=[dict(lr_mult=0), dict(lr_mult=0)]
             
             if config['center']:
-                beta = np.array(blobs[0])
+                beta = np.array(blobs[-3])
                 param['bias_term']=True
             else:
                 beta = np.zeros(mean.shape, dtype=np.float32)
                 param['bias_term']=False
             
+            caffe_net[name] = L.BatchNorm(caffe_net[outputs[bottom]], in_place=True)
+            	#param=[dict(lr_mult=1, decay_mult=1), dict(lr_mult=1, decay_mult=1), dict(lr_mult=0, decay_mult=0)])
+            	#param=[dict(lr_mult=1), dict(lr_mult=1), dict(lr_mult=0)])
+                
             net_params[name] = (mean, variance, np.array(1.0)) 
             
             name_s = name+'s'
             
-            caffe_net[name_s] = L.Scale(caffe_net[name], in_place=True, scale_param=param)
+            caffe_net[name_s] = L.Scale(caffe_net[name], in_place=True, 
+            	param=sparam, scale_param={'bias_term': config['center']})
             net_params[name_s] = (gamma, beta)
             
         elif layer_type=='Dense':
-            caffe_net[name] = L.InnerProduct(caffe_net[outputs[bottom]], num_output=config['units'])
+            caffe_net[name] = L.InnerProduct(caffe_net[outputs[bottom]], 
+            	num_output=config['units'], weight_filler=dict(type='xavier'))
             
             if config['use_bias']:
                 net_params[name] = (np.array(blobs[0]).transpose(1, 0), np.array(blobs[1]))
@@ -108,10 +184,26 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
             	caffe_net['softmax'] = L.Softmax(caffe_net[name], in_place=True)
         
         elif layer_type=='Activation':
-            if config['activation']!='relu':
-                raise Exception('Unsupported activation')
-            caffe_net[name] = L.ReLU(caffe_net[outputs[bottom]], in_place=True)
-            
+            if config['activation']=='relu':
+            	#caffe_net[name] = L.ReLU(caffe_net[outputs[bottom]], in_place=True)
+            	if len(layer.input.consumers())>1:
+            	    caffe_net[name] = L.ReLU(caffe_net[outputs[bottom]])
+            	else:
+            	    caffe_net[name] = L.ReLU(caffe_net[outputs[bottom]], in_place=True)
+            	
+            elif config['activation']=='softmax':
+                caffe_net[name] = L.Softmax(caffe_net[outputs[bottom]], in_place=True)
+            else:
+            	raise Exception('Unsupported activation '+config['activation'])
+        
+        elif layer_type=='Cropping2D':
+            shape = layer.output_shape
+            ddata = L.DummyData(shape=dict(dim=[1, shape[3],shape[1], shape[2]]))
+            layers = []
+            layers.append(caffe_net[outputs[bottom]])   
+            layers.append(ddata)   #TODO
+            caffe_net[name] = L.Crop(*layers)
+        
         elif layer_type=='Concatenate' or layer_type=='Merge':
             layers = []
             for i in layer.input:
@@ -143,26 +235,40 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
             if strides[0]!=strides[1]:
                 raise Exception('Unsupported strides')
             
+            #TODO
+            #if pool_size[0]<strides[0]:
+            #    pool_size=(strides[0],strides[0])
+            
             pad=0
             if padding=='same':
-                pad=pool_size[0]/2
+                #pad=pool_size[0]/(strides[0]*2)
+                pad = (pool_size[0]*layer.output_shape[1] - (pool_size[0]-strides[0])*(layer.output_shape[1]-1) - layer.input_shape[1])/2
                 
             caffe_net[name] = L.Pooling(caffe_net[outputs[bottom]], kernel_size=pool_size[0], 
                 stride=strides[0], pad=pad, pool=pool)
         
         elif layer_type=='Dropout':
-            caffe_net[name] = L.Dropout(caffe_net[outputs[bottom]], dropout_param=dict(dropout_ratio=config['rate']))
+            caffe_net[name] = L.Dropout(caffe_net[outputs[bottom]], 
+            	dropout_param=dict(dropout_ratio=config['rate']))
+        
+        elif layer_type=='GlobalAveragePooling2D':
+            caffe_net[name] = L.Pooling(caffe_net[outputs[bottom]], pool=P.Pooling.AVE, 
+            	pooling_param=dict(global_pooling=True))
         
         #TODO
         
-        elif layer_type=='GlobalAveragePooling2D':
-            caffe_net[name] = L.Pooling(caffe_net[outputs[bottom]], kernel_size=8, stride=8, pad=0, pool=P.Pooling.AVE)
-        
         elif layer_type=='ZeroPadding2D':
             padding=config['padding']
-            caffe_net[name] = L.Convolution(caffe_net[outputs[bottom]], num_output=3, kernel_size=1, stride=1,
-                pad_h=padding[0][0], pad_w=padding[1][0], convolution_param=dict(bias_term = False))
-            net_params[name] = np.ones((3,3,1,1))
+            #ch = layer.input_shape[3]
+            #caffe_net[name] = L.Convolution(caffe_net[outputs[bottom]], num_output=ch, kernel_size=1, stride=1, group=ch,
+            #    pad_h=padding[0][0], pad_w=padding[1][0], convolution_param=dict(bias_term = False))
+            #params = np.ones((1,ch,1,1))
+            
+            #net_params[name] = np.ones((1,ch,1,1,1))
+            #net_params[name] = np.ones(layer.output_shape)
+            
+            caffe_net[name] = L.Pooling(caffe_net[outputs[bottom]], kernel_size=1, 
+                stride=1, pad_h=padding[0][1], pad_w=padding[1][1], pool=P.Pooling.AVE)
         
         else:
             raise Exception('Unsupported layer type: '+layer_type)
