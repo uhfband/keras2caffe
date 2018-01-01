@@ -15,6 +15,7 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
     shape=()
     
     input_str = ''
+    flatten_shape = None
     
     for layer in keras_model.layers:
         name = layer.name
@@ -81,6 +82,10 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
             
             blobs[0] = np.array(blobs[0]).transpose(3,2,0,1)
             net_params[name] = blobs
+
+            if config['activation']=='relu':
+                name_s = name+'s'
+                caffe_net[name_s] = L.ReLU(caffe_net[name], in_place=True)
         
         elif layer_type=='SeparableConv2D':
             
@@ -176,12 +181,20 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
             	num_output=config['units'], weight_filler=dict(type='xavier'))
             
             if config['use_bias']:
-                net_params[name] = (np.array(blobs[0]).transpose(1, 0), np.array(blobs[1]))
+                weight=np.array(blobs[0]).transpose(1, 0)
+                if flatten_shape!=None:
+                  for i in range(weight.shape[0]):
+                      weight[i]=np.array(weight[i].reshape(flatten_shape[1],flatten_shape[2],flatten_shape[3]).transpose(2,0,1).reshape(weight.shape[1]))
+                  flatten_shape=None
+                net_params[name] = (weight, np.array(blobs[1]))
             else:
                 net_params[name] = (blobs[0])
                 
+            name_s = name+'s'
             if config['activation']=='softmax':
-            	caffe_net['softmax'] = L.Softmax(caffe_net[name], in_place=True)
+                caffe_net[name_s] = L.Softmax(caffe_net[name], in_place=True)
+            elif config['activation']=='relu':
+                caffe_net[name_s] = L.ReLU(caffe_net[name], in_place=True)
         
         elif layer_type=='Activation':
             if config['activation']=='relu':
@@ -217,6 +230,7 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
             caffe_net[name] = L.Eltwise(*layers)
         
         elif layer_type=='Flatten':
+            flatten_shape=layer.input_shape
             caffe_net[name] = L.Flatten(caffe_net[outputs[bottom]])
         
         elif layer_type=='MaxPooling2D' or layer_type=='AveragePooling2D':
