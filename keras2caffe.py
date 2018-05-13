@@ -85,7 +85,7 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
             if config['activation']=='relu':
                 name_s = name+'s'
                 caffe_net[name_s] = L.ReLU(caffe_net[name], in_place=True)
-        
+
         elif layer_type == 'SeparableConv2D':
 
             strides = config['strides']
@@ -267,6 +267,18 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
             caffe_net[name] = L.Pooling(caffe_net[outputs[bottom]], pool=P.Pooling.AVE, 
             	pooling_param=dict(global_pooling=True))
         
+        elif layer_type=='UpSampling2D':
+            if config['size'][0]!=config['size'][1]:
+                raise Exception('Unsupported upsampling factor')
+            factor = config['size'][0]
+            kernel_size = 2 * factor - factor % 2
+            stride = factor
+            pad = int(math.ceil((factor - 1) / 2.0))
+            channels = layer.input_shape[-1]
+            caffe_net[name] = L.Deconvolution(caffe_net[outputs[bottom]], convolution_param=dict(num_output=channels, 
+                group=channels, kernel_size=kernel_size, stride=stride, pad=pad, weight_filler=dict(type='bilinear'), 
+                bias_term=False), param=dict(lr_mult=0, decay_mult=0))
+        
         #TODO
         
         elif layer_type=='ZeroPadding2D':
@@ -298,6 +310,8 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
     caffe_model = caffe.Net(caffe_net_file, caffe.TEST)
     
     for layer in caffe_model.params.keys():
+        if 'up_sampling2d' in layer:
+            continue
         for n in range(0, len(caffe_model.params[layer])):
             caffe_model.params[layer][n].data[...] = net_params[layer][n]
 
