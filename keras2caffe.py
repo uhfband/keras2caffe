@@ -86,59 +86,73 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
                 name_s = name+'s'
                 caffe_net[name_s] = L.ReLU(caffe_net[name], in_place=True)
         
-        elif layer_type=='SeparableConv2D':
-            
+        elif layer_type == 'SeparableConv2D':
+
             strides = config['strides']
             kernel_size = config['kernel_size']
             padding = config['padding']
-            
-            kwargs = { 'num_output': layer.input_shape[3] }
-            
-            if kernel_size[0]==kernel_size[1]:
-            	kwargs['kernel_size']=kernel_size[0]
+
+            kwargs = {'num_output': layer.input_shape[3]}
+
+            if kernel_size[0] == kernel_size[1]:
+                kwargs['kernel_size'] = kernel_size[0]
             else:
-            	kwargs['kernel_h']=kernel_size[0]
-            	kwargs['kernel_w']=kernel_size[1]
-            
-            if strides[0]==strides[1]:
-            	kwargs['stride']=strides[0]
+                kwargs['kernel_h'] = kernel_size[0]
+                kwargs['kernel_w'] = kernel_size[1]
+
+            if strides[0] == strides[1]:
+                kwargs['stride'] = strides[0]
             else:
-            	kwargs['stride_h']=strides[0]
-            	kwargs['stride_w']=strides[1]
-            
+                kwargs['stride_h'] = strides[0]
+                kwargs['stride_w'] = strides[1]
+
             if not config['use_bias']:
-            	kwargs['bias_term'] = False
-            	#kwargs['param']=[dict(lr_mult=0)]
+                kwargs['bias_term'] = False
+            # kwargs['param']=[dict(lr_mult=0)]
             else:
-                #kwargs['param']=[dict(lr_mult=0), dict(lr_mult=0)]
+                # kwargs['param']=[dict(lr_mult=0), dict(lr_mult=0)]
                 pass
-            
-            if padding=='same':
-            	if kernel_size[0]==kernel_size[1]:
-            		kwargs['pad'] = kernel_size[0]/2
-            		#kwargs['pad'] = kernel_size[0]/(strides[0]*2)
-            	else:
-            		kwargs['pad_h'] = kernel_size[0]/2
-            		kwargs['pad_w'] = kernel_size[1]/2
-            		#kwargs['pad_h'] = kernel_size[0]/(strides[0]*2)
-            		#kwargs['pad_w'] = kernel_size[1]/(strides[1]*2)
-            
+
+            if padding == 'same':
+                if kernel_size[0] == kernel_size[1]:
+                    kwargs['pad'] = kernel_size[0] / 2
+                # kwargs['pad'] = kernel_size[0]/(strides[0]*2)
+                else:
+                    kwargs['pad_h'] = kernel_size[0] / 2
+                    kwargs['pad_w'] = kernel_size[1] / 2
+                # kwargs['pad_h'] = kernel_size[0]/(strides[0]*2)
+                # kwargs['pad_w'] = kernel_size[1]/(strides[1]*2)
+
             kwargs['group'] = layer.input_shape[3]
-            
-            caffe_net[name] = L.Convolution(caffe_net[outputs[bottom]], **kwargs)
-            blob = np.array(blobs[0]).transpose(2,3,0,1)
-            blob.shape = (1,) + blob.shape
-            net_params[name] = blob
-            
-            name2 = name+'_'
-            
-            kwargs = { 'num_output':  config['filters'], 'kernel_size': 1, 'bias_term': False}
-            caffe_net[name2] = L.Convolution(caffe_net[name], **kwargs)
-            
-            blob2 = np.array(blobs[1]).transpose(3,2,0,1)
-            blob2.shape = (1,) + blob2.shape
-            net_params[name2] = blob2
-            name = name2
+
+            if config['use_bias'] == True:
+                kwargs['bias_term'] = False
+                caffe_net[name] = L.Convolution(caffe_net[outputs[bottom]], **kwargs)
+                blob = np.array(blobs[0]).transpose(2, 3, 0, 1)
+                blob.shape = (1,) + blob.shape
+                net_params[name] = blob
+                name2 = name + '_'
+                kwargs = {'num_output': config['filters'], 'kernel_size': 1, 'bias_term': False}
+                kwargs['bias_term'] = True
+                caffe_net[name2] = L.Convolution(caffe_net[name], **kwargs)
+                blob2 = []
+                blob2.append(np.array(blobs[1]).transpose(3, 2, 0, 1))
+                blob2.append(np.array(blobs[2]))
+                blob2[0].shape = (1,) + blob2[0].shape
+                net_params[name2] = blob2
+                name = name2
+            else:
+                caffe_net[name] = L.Convolution(caffe_net[outputs[bottom]], **kwargs)
+                blob = np.array(blobs[0]).transpose(2, 3, 0, 1)
+                blob.shape = (1,) + blob.shape
+                net_params[name] = blob
+                name2 = name + '_'
+                kwargs = {'num_output': config['filters'], 'kernel_size': 1, 'bias_term': False}
+                caffe_net[name2] = L.Convolution(caffe_net[name], **kwargs)
+                blob2 = np.array(blobs[1]).transpose(3, 2, 0, 1)
+                blob2.shape = (1,) + blob2.shape
+                net_params[name2] = blob2
+                name = name2
         
         elif layer_type=='BatchNormalization':
             
