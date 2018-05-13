@@ -82,9 +82,14 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
             blobs[0] = np.array(blobs[0]).transpose(3,2,0,1)
             net_params[name] = blobs
 
-            if config['activation']=='relu':
+            if config['activation'] == 'relu':
                 name_s = name+'s'
                 caffe_net[name_s] = L.ReLU(caffe_net[name], in_place=True)
+            elif config['activation'] == 'sigmoid':
+                name_s = name+'s'
+                caffe_net[name_s] = L.Sigmoid(caffe_net[name], in_place=True)
+            else:
+                raise Exception('Unsupported activation '+config['activation'])
 
         elif layer_type == 'SeparableConv2D':
 
