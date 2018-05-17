@@ -88,6 +88,9 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
             elif config['activation'] == 'sigmoid':
                 name_s = name+'s'
                 caffe_net[name_s] = L.Sigmoid(caffe_net[name], in_place=True)
+            elif config['activation'] == 'linear':
+                #do nothing
+                pass
             else:
                 raise Exception('Unsupported activation '+config['activation'])
 
