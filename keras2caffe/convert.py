@@ -93,6 +93,56 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
                 pass
             else:
                 raise Exception('Unsupported activation '+config['activation'])
+        
+        elif layer_type=='DepthwiseConv2D':
+            
+            strides = config['strides']
+            kernel_size = config['kernel_size']
+            padding = config['padding']
+
+            kwargs = {'num_output': layer.input_shape[3]}
+
+            if kernel_size[0] == kernel_size[1]:
+                kwargs['kernel_size'] = kernel_size[0]
+            else:
+                kwargs['kernel_h'] = kernel_size[0]
+                kwargs['kernel_w'] = kernel_size[1]
+
+            if strides[0] == strides[1]:
+                kwargs['stride'] = strides[0]
+            else:
+                kwargs['stride_h'] = strides[0]
+                kwargs['stride_w'] = strides[1]
+
+            if padding == 'same':
+                if kernel_size[0] == kernel_size[1]:
+                    kwargs['pad'] = kernel_size[0] / 2
+                # kwargs['pad'] = kernel_size[0]/(strides[0]*2)
+                else:
+                    kwargs['pad_h'] = kernel_size[0] / 2
+                    kwargs['pad_w'] = kernel_size[1] / 2
+                # kwargs['pad_h'] = kernel_size[0]/(strides[0]*2)
+                # kwargs['pad_w'] = kernel_size[1]/(strides[1]*2)
+
+            kwargs['group'] = layer.input_shape[3]
+
+            kwargs['bias_term'] = False
+            caffe_net[name] = L.Convolution(caffe_net[outputs[bottom]], **kwargs)
+            blob = np.array(blobs[0]).transpose(2, 3, 0, 1)
+            blob.shape = (1,) + blob.shape
+            net_params[name] = blob
+            
+            if config['activation'] == 'relu':
+                name_s = name+'s'
+                caffe_net[name_s] = L.ReLU(caffe_net[name], in_place=True)
+            elif config['activation'] == 'sigmoid':
+                name_s = name+'s'
+                caffe_net[name_s] = L.Sigmoid(caffe_net[name], in_place=True)
+            elif config['activation'] == 'linear':
+                #do nothing
+                pass
+            else:
+                raise Exception('Unsupported activation '+config['activation'])
 
         elif layer_type == 'SeparableConv2D':
 
@@ -147,7 +197,7 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
 
             net_params[name2] = blob2
             name = name2
-        
+
         elif layer_type=='BatchNormalization':
             
             param = dict()
@@ -205,16 +255,18 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
         
         elif layer_type=='Activation':
             if config['activation']=='relu':
-            	#caffe_net[name] = L.ReLU(caffe_net[outputs[bottom]], in_place=True)
-            	if len(layer.input.consumers())>1:
-            	    caffe_net[name] = L.ReLU(caffe_net[outputs[bottom]])
-            	else:
-            	    caffe_net[name] = L.ReLU(caffe_net[outputs[bottom]], in_place=True)
-            	
+                #caffe_net[name] = L.ReLU(caffe_net[outputs[bottom]], in_place=True)
+                if len(layer.input.consumers())>1:
+                    caffe_net[name] = L.ReLU(caffe_net[outputs[bottom]])
+                else:
+                    caffe_net[name] = L.ReLU(caffe_net[outputs[bottom]], in_place=True)
+            elif config['activation']=='relu6':
+                #TODO
+                caffe_net[name] = L.ReLU(caffe_net[outputs[bottom]])
             elif config['activation']=='softmax':
                 caffe_net[name] = L.Softmax(caffe_net[outputs[bottom]], in_place=True)
             else:
-            	raise Exception('Unsupported activation '+config['activation'])
+                raise Exception('Unsupported activation '+config['activation'])
         
         elif layer_type=='Cropping2D':
             shape = layer.output_shape
@@ -238,6 +290,17 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
         
         elif layer_type=='Flatten':
             caffe_net[name] = L.Flatten(caffe_net[outputs[bottom]])
+        
+        elif layer_type=='Reshape':
+            shape = config['target_shape']
+            if len(shape)==3:
+                #shape = (layer.input_shape[0], shape[2], shape[0], shape[1])
+                shape = (1, shape[2], shape[0], shape[1])
+            elif len(shape)==1:
+                #shape = (layer.input_shape[0], 1, 1, shape[0])
+                shape = (1, 1, 1, shape[0])
+            caffe_net[name] = L.Reshape(caffe_net[outputs[bottom]], 
+                reshape_param={'shape':{'dim': list(shape)}})
         
         elif layer_type=='MaxPooling2D' or layer_type=='AveragePooling2D':
             if layer_type=='MaxPooling2D':
