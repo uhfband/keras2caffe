@@ -8,7 +8,7 @@ Working conversion examples:
 - Xception V1
 - SqueezeNet (https://github.com/rcmalli/keras-squeezenet)
 - VGG16
-
+- MobileNet
 
 Problem layers:
 - ZeroPadding2D
