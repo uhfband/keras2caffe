@@ -4,6 +4,45 @@ from caffe import layers as L, params as P
 import math
 import numpy as np
 
+def set_padding(config_keras, input_shape, config_caffe):
+    if config_keras['padding']=='valid':
+        return
+    elif config_keras['padding']=='same':
+        #pad = ((layer.output_shape[1] - 1)*strides[0] + pool_size[0] - layer.input_shape[1])/2
+        #pad=pool_size[0]/(strides[0]*2)
+        #pad = (pool_size[0]*layer.output_shape[1] - (pool_size[0]-strides[0])*(layer.output_shape[1]-1) - layer.input_shape[1])/2
+        
+        if 'kernel_size' in config_keras:
+            kernel_size = config_keras['kernel_size']
+        elif 'pool_size' in config_keras:
+            kernel_size = config_keras['pool_size']
+        else:
+            raise Exception('Undefined kernel size')
+        
+        #pad_w = int(kernel_size[1] // 2)
+        #pad_h = int(kernel_size[0] // 2)
+        
+        strides = config_keras['strides']
+        w = input_shape[1]
+        h = input_shape[2]
+        
+        out_w = math.ceil(w / float(strides[1]))
+        pad_w = int((kernel_size[1]*out_w - (kernel_size[1]-strides[1])*(out_w - 1) - w)/2)
+        
+        out_h = math.ceil(h / float(strides[0]))
+        pad_h = int((kernel_size[0]*out_h - (kernel_size[0]-strides[0])*(out_h - 1) - h)/2)
+        
+        if pad_w==0 and pad_h==0:
+            return
+        
+        if pad_w==pad_h:
+            config_caffe['pad'] = pad_w
+        else:
+            config_caffe['pad_h'] = pad_h
+            config_caffe['pad_w'] = pad_w
+        
+    else:
+        raise Exception(config_keras['padding']+' padding is not supported')
 
 def convert(keras_model, caffe_net_file, caffe_params_file):
     
@@ -44,7 +83,6 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
             
             strides = config['strides']
             kernel_size = config['kernel_size']
-            padding = config['padding']
             
             kwargs = { 'num_output': config['filters'] }
             
@@ -67,15 +105,7 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
                 #kwargs['param']=[dict(lr_mult=0), dict(lr_mult=0)]
                 pass
             
-            if padding=='same':
-            	if kernel_size[0]==kernel_size[1]:
-            		kwargs['pad'] = kernel_size[0]/2
-            		#kwargs['pad'] = kernel_size[0]/(strides[0]*2)
-            	else:
-            		kwargs['pad_h'] = kernel_size[0]/2
-            		kwargs['pad_w'] = kernel_size[1]/2
-            		#kwargs['pad_h'] = kernel_size[0]/(strides[0]*2)
-            		#kwargs['pad_w'] = kernel_size[1]/(strides[1]*2)
+            set_padding(config, layer.input_shape, kwargs)
             
             caffe_net[name] = L.Convolution(caffe_net[outputs[bottom]], **kwargs)
             
@@ -98,7 +128,6 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
             
             strides = config['strides']
             kernel_size = config['kernel_size']
-            padding = config['padding']
 
             kwargs = {'num_output': layer.input_shape[3]}
 
@@ -114,15 +143,7 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
                 kwargs['stride_h'] = strides[0]
                 kwargs['stride_w'] = strides[1]
 
-            if padding == 'same':
-                if kernel_size[0] == kernel_size[1]:
-                    kwargs['pad'] = kernel_size[0] / 2
-                # kwargs['pad'] = kernel_size[0]/(strides[0]*2)
-                else:
-                    kwargs['pad_h'] = kernel_size[0] / 2
-                    kwargs['pad_w'] = kernel_size[1] / 2
-                # kwargs['pad_h'] = kernel_size[0]/(strides[0]*2)
-                # kwargs['pad_w'] = kernel_size[1]/(strides[1]*2)
+            set_padding(config, layer.input_shape, kwargs)
 
             kwargs['group'] = layer.input_shape[3]
 
@@ -148,7 +169,6 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
 
             strides = config['strides']
             kernel_size = config['kernel_size']
-            padding = config['padding']
 
             kwargs = {'num_output': layer.input_shape[3]}
 
@@ -164,15 +184,7 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
                 kwargs['stride_h'] = strides[0]
                 kwargs['stride_w'] = strides[1]
 
-            if padding == 'same':
-                if kernel_size[0] == kernel_size[1]:
-                    kwargs['pad'] = kernel_size[0] / 2
-                # kwargs['pad'] = kernel_size[0]/(strides[0]*2)
-                else:
-                    kwargs['pad_h'] = kernel_size[0] / 2
-                    kwargs['pad_w'] = kernel_size[1] / 2
-                # kwargs['pad_h'] = kernel_size[0]/(strides[0]*2)
-                # kwargs['pad_w'] = kernel_size[1]/(strides[1]*2)
+            set_padding(config, layer.input_shape, kwargs)
 
             kwargs['group'] = layer.input_shape[3]
 
@@ -303,14 +315,16 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
                 reshape_param={'shape':{'dim': list(shape)}})
         
         elif layer_type=='MaxPooling2D' or layer_type=='AveragePooling2D':
+            
+            kwargs={}
+            
             if layer_type=='MaxPooling2D':
-                pool = P.Pooling.MAX
+                kwargs['pool'] = P.Pooling.MAX
             else:
-                pool = P.Pooling.AVE
+                kwargs['pool'] = P.Pooling.AVE
                 
             pool_size = config['pool_size']
             strides  = config['strides']
-            padding = config['padding']
             
             if pool_size[0]!=pool_size[1]:
                 raise Exception('Unsupported pool_size')
@@ -318,25 +332,18 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
             if strides[0]!=strides[1]:
                 raise Exception('Unsupported strides')
             
-            #TODO
-            #if pool_size[0]<strides[0]:
-            #    pool_size=(strides[0],strides[0])
+            set_padding(config, layer.input_shape, kwargs)
             
-            pad=0
-            if padding=='same':
-                #pad=pool_size[0]/(strides[0]*2)
-                pad = (pool_size[0]*layer.output_shape[1] - (pool_size[0]-strides[0])*(layer.output_shape[1]-1) - layer.input_shape[1])/2
-                
             caffe_net[name] = L.Pooling(caffe_net[outputs[bottom]], kernel_size=pool_size[0], 
-                stride=strides[0], pad=pad, pool=pool)
+                stride=strides[0], **kwargs)
         
         elif layer_type=='Dropout':
             caffe_net[name] = L.Dropout(caffe_net[outputs[bottom]], 
-            	dropout_param=dict(dropout_ratio=config['rate']))
+                dropout_param=dict(dropout_ratio=config['rate']))
         
         elif layer_type=='GlobalAveragePooling2D':
             caffe_net[name] = L.Pooling(caffe_net[outputs[bottom]], pool=P.Pooling.AVE, 
-            	pooling_param=dict(global_pooling=True))
+                pooling_param=dict(global_pooling=True))
         
         elif layer_type=='UpSampling2D':
             if config['size'][0]!=config['size'][1]:
