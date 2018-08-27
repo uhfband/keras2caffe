@@ -72,14 +72,17 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
         if type(layer.input)!=list:
             bottom = layer.input.name
             
-        if layer_type=='InputLayer':
+        if layer_type=='InputLayer' or 'batch_input_shape' in config:
             name = 'data'
             caffe_net[name] = L.Layer()
             input_shape=config['batch_input_shape']
             input_str = 'input: {}\ninput_dim: {}\ninput_dim: {}\ninput_dim: {}\ninput_dim: {}'.format('"' + name + '"',
                 1, input_shape[3], input_shape[1], input_shape[2])
+            if(layer_type!='InputLayer'):
+                outputs[layer.name+'_input:0']=name
+                name=layer.name
             
-        elif layer_type=='Conv2D' or layer_type=='Convolution2D':
+        if layer_type=='Conv2D' or layer_type=='Convolution2D':
             
             strides = config['strides']
             kernel_size = config['kernel_size']
