@@ -71,17 +71,19 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
         
         if type(layer.input)!=list:
             bottom = layer.input.name
-            
-        if layer_type=='InputLayer' or 'batch_input_shape' in config:
-            name = 'data'
-            caffe_net[name] = L.Layer()
-            input_shape=config['batch_input_shape']
-            input_str = 'input: {}\ninput_dim: {}\ninput_dim: {}\ninput_dim: {}\ninput_dim: {}'.format('"' + name + '"',
+        
+        #first we need to create Input layer
+        if layer_type=='InputLayer' or not hasattr(caffe_net, 'data'):
+
+            input_name = 'data'
+            caffe_net[input_name] = L.Layer()
+            input_shape = config['batch_input_shape']
+            input_str = 'input: {}\ninput_dim: {}\ninput_dim: {}\ninput_dim: {}\ninput_dim: {}'.format('"' + input_name + '"',
                 1, input_shape[3], input_shape[1], input_shape[2])
-            if(layer_type!='InputLayer'):
-                outputs[layer.name+'_input:0']=name
-                name=layer.name
-            
+            outputs[layer.input.name] = input_name
+            if layer_type=='InputLayer':
+                continue
+                
         if layer_type=='Conv2D' or layer_type=='Convolution2D':
             
             strides = config['strides']

@@ -1,0 +1,1 @@
+wget https://github.com/oarriaga/face_classification/raw/master/trained_models/gender_models/simple_CNN.81-0.96.hdf5
