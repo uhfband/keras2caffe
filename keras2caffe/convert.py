@@ -60,7 +60,7 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
         layer_type = type(layer).__name__
         
         config = layer.get_config()
-        
+
         blobs = layer.get_weights()
         blobs_num = len(blobs)
         
@@ -256,8 +256,8 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
             
             if config['use_bias']:
                 weight=np.array(blobs[0]).transpose(1, 0)
-                if type(layer.inbound_nodes[0].inbound_layers[0]).__name__=='Flatten':
-                    flatten_shape=layer.inbound_nodes[0].inbound_layers[0].input_shape
+                if type(layer._inbound_nodes[0].inbound_layers[0]).__name__=='Flatten':
+                    flatten_shape=layer._inbound_nodes[0].inbound_layers[0].input_shape
                     for i in range(weight.shape[0]):
                         weight[i]=np.array(weight[i].reshape(flatten_shape[1],flatten_shape[2],flatten_shape[3]).transpose(2,0,1).reshape(weight.shape[1]))
                 net_params[name] = (weight, np.array(blobs[1]))
@@ -375,7 +375,7 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
             #net_params[name] = np.ones(layer.output_shape)
             
             caffe_net[name] = L.Pooling(caffe_net[outputs[bottom]], kernel_size=1, 
-                stride=1, pad_h=padding[0][1], pad_w=padding[1][1], pool=P.Pooling.AVE)
+                stride=1, pad_h=padding[0][0]+padding[0][1], pad_w=padding[1][0]+padding[1][1], pool=P.Pooling.AVE)
         
         else:
             raise Exception('Unsupported layer type: '+layer_type)

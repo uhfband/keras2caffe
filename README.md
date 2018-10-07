@@ -1,6 +1,6 @@
 # Keras to Caffe model converter
 
-This tool tested with Caffe 1.0, Keras 2.1.2 and TensorFlow 1.4.0
+This tool tested with Caffe 1.0, Keras 2.1.5 and TensorFlow 1.4.1
 
 Working conversion examples:
 - Inception V3
@@ -8,10 +8,7 @@ Working conversion examples:
 - Xception V1
 - SqueezeNet (https://github.com/rcmalli/keras-squeezenet)
 - VGG16
-- MobileNet
+- ~~MobileNet~~ (waiting for the pad layer)
 
-Problem layers:
-- ZeroPadding2D
-- MaxPooling2D and AveragePooling2D with asymmetric padding
 
 

@@ -3,9 +3,16 @@ import cv2
 import numpy as np
 
 import sys
-sys.path.append('/home/data/keras-models/keras-squeezenet')
+sys.path.append('/media/toshiba_ml/models/keras-models/keras-squeezenet')
 
 from keras_squeezenet import SqueezeNet
+
+#TensorFlow backend uses all GPU memory by default, so we need limit
+import tensorflow as tf
+from keras.backend.tensorflow_backend import set_session
+config = tf.ConfigProto()
+config.gpu_options.per_process_gpu_memory_fraction = 0.5
+set_session(tf.Session(config=config))
 
 import keras2caffe
 

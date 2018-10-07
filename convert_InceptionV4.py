@@ -12,7 +12,7 @@ set_session(tf.Session(config=config))
 import keras2caffe
 
 import sys
-sys.path.append('/home/data/keras-models/keras-inceptionV4')
+sys.path.append('/media/toshiba_ml/models/keras-models/keras-inceptionV4')
 
 import inception_v4
 #import evalute_image
