@@ -1,3 +1,9 @@
+import sys
+sys.path.append('../../')
+import keras2caffe
+
+DATA_DIR='../../data/'
+
 import caffe
 import cv2
 import numpy as np
@@ -5,7 +11,6 @@ import numpy as np
 from keras.applications.vgg16 import VGG16
 from keras.preprocessing import image
 
-import keras2caffe
 
 #TensorFlow backend uses all GPU memory by default, so we need limit
 import tensorflow as tf
@@ -18,14 +23,14 @@ set_session(tf.Session(config=config))
 
 keras_model = VGG16(input_shape=(224, 224, 3), weights='imagenet', include_top=True)
 
-keras2caffe.convert(keras_model, 'VGG16.prototxt', 'VGG16.caffemodel')
+keras2caffe.convert(keras_model, 'deploy.prototxt', 'VGG16.caffemodel')
 
 #testing the model
 
-#caffe.set_mode_gpu()
-net  = caffe.Net('VGG16.prototxt', 'VGG16.caffemodel', caffe.TEST)
+caffe.set_mode_gpu()
+net  = caffe.Net('deploy.prototxt', 'VGG16.caffemodel', caffe.TEST)
 
-img = cv2.imread('bear.jpg')
+img = cv2.imread(DATA_DIR+'bear.jpg')
 img = cv2.resize(img, (224, 224))
 img = img[...,::-1]  #RGB 2 BGR
 
@@ -39,5 +44,5 @@ out = net.forward_all(data = data)
 pred = out['predictions']
 prob = np.max(pred)
 cls = pred.argmax()
-lines=open('synset_words.txt').readlines()
+lines=open(DATA_DIR+'synset_words.txt').readlines()
 print prob, cls, lines[cls]

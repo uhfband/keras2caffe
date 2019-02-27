@@ -1,11 +1,15 @@
+import sys
+sys.path.append('../../')
+import keras2caffe
+
+DATA_DIR='../../data/'
+
 import caffe
 import cv2
 import numpy as np
 
 from keras.applications.mobilenet import MobileNet
 import keras
-
-import keras2caffe
 
 #TensorFlow backend uses all GPU memory by default, so we need limit
 import tensorflow as tf
@@ -30,7 +34,7 @@ keras2caffe.convert(keras_model, caffe_proto, caffe_weights)
 
 net  = caffe.Net(caffe_proto, caffe_weights, caffe.TEST)
 
-img = cv2.imread('bear.jpg')
+img = cv2.imread(DATA_DIR+'bear.jpg')
 img = cv2.resize(img, (224, 224))
 img = img[...,::-1]  #RGB 2 BGR
 
@@ -49,6 +53,6 @@ pred = out['reshape_2']
 prob = np.max(pred)
 cls = pred.argmax()
 
-lines=open('synset_words.txt').readlines()
+lines=open(DATA_DIR+'synset_words.txt').readlines()
 print prob, cls, lines[cls]
 

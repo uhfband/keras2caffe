@@ -1,10 +1,14 @@
+import sys
+sys.path.append('../../')
+import keras2caffe
+
+DATA_DIR='../../data/'
+
 import caffe
 import cv2
 import numpy as np
 
 from keras.applications.inception_v3 import InceptionV3
-
-import keras2caffe
 
 #TensorFlow backend uses all GPU memory by default, so we need limit
 import tensorflow as tf
@@ -26,7 +30,7 @@ keras2caffe.convert(keras_model, 'deploy.prototxt', 'InceptionV3.caffemodel')
 caffe.set_mode_gpu()
 net  = caffe.Net('deploy.prototxt', 'InceptionV3.caffemodel', caffe.TEST)
 
-img = cv2.imread('bear.jpg')
+img = cv2.imread(DATA_DIR+'bear.jpg')
 img = cv2.resize(img, (299, 299))
 img = img[...,::-1]  #RGB 2 BGR
 
@@ -45,6 +49,6 @@ pred = out['predictions']
 prob = np.max(pred)
 cls = pred.argmax()
 
-lines=open('synset_words.txt').readlines()
+lines=open(DATA_DIR+'synset_words.txt').readlines()
 print prob, cls, lines[cls]
 

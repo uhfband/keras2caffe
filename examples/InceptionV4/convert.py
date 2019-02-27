@@ -1,3 +1,9 @@
+import sys
+sys.path.append('../../')
+import keras2caffe
+
+DATA_DIR='../../data/'
+
 import caffe
 import cv2
 import numpy as np
@@ -9,10 +15,8 @@ config = tf.ConfigProto()
 config.gpu_options.per_process_gpu_memory_fraction = 0.5
 set_session(tf.Session(config=config))
 
-import keras2caffe
 
-import sys
-sys.path.append('/media/toshiba_ml/models/keras-models/keras-inceptionV4')
+sys.path.append('/media/raid/ML/models/keras/keras-inceptionV4')
 
 import inception_v4
 #import evalute_image
@@ -21,14 +25,14 @@ import inception_v4
 
 keras_model = inception_v4.create_model(weights='imagenet', include_top=True, dropout_prob=0.8)
 
-keras2caffe.convert(keras_model, 'InceptionV4.prototxt', 'InceptionV4.caffemodel')
+keras2caffe.convert(keras_model, 'deploy.prototxt', 'InceptionV4.caffemodel')
 
 #testing the model
 
 caffe.set_mode_gpu()
-net  = caffe.Net('InceptionV4.prototxt', 'InceptionV4.caffemodel', caffe.TEST)
+net  = caffe.Net('deploy.prototxt', 'InceptionV4.caffemodel', caffe.TEST)
 
-img = cv2.imread('bear.jpg')
+img = cv2.imread(DATA_DIR+'bear.jpg')
 #img = evaluate_image.central_crop(im, 0.875)
 
 img = cv2.resize(img, (299, 299))
@@ -51,7 +55,7 @@ net.blobs['data'].data[...] = data
 out = net.forward()
 preds = out['dense_1']
 
-classes = eval(open('class_names.txt', 'r').read())
+classes = eval(open(DATA_DIR+'class_names.txt', 'r').read())
 print("Class is: " + classes[np.argmax(preds)-1])
 print("Certainty is: " + str(preds[0][np.argmax(preds)]))
 
