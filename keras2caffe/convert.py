@@ -73,7 +73,7 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
             bottom = layer.input.name
         
         #first we need to create Input layer
-        if layer_type=='InputLayer' or not hasattr(caffe_net, 'data'):
+        if layer_type=='InputLayer' or len(caffe_net.tops)==0:
 
             input_name = 'data'
             caffe_net[input_name] = L.Layer()
