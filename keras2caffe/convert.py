@@ -362,8 +362,10 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
                 group=channels, kernel_size=kernel_size, stride=stride, pad=pad, weight_filler=dict(type='bilinear'), 
                 bias_term=False), param=dict(lr_mult=0, decay_mult=0))
         
+        elif layer_type=='LeakyReLU':
+            caffe_net[name] = L.ReLU(caffe_net[outputs[bottom]], negative_slope=config['alpha'], in_place=True)
+
         #TODO
-        
         elif layer_type=='ZeroPadding2D':
             padding=config['padding']
             #ch = layer.input_shape[3]
