@@ -282,6 +282,9 @@ def convert(keras_model, caffe_net_file, caffe_params_file):
                 caffe_net[name] = L.ReLU(caffe_net[outputs[bottom]])
             elif config['activation']=='softmax':
                 caffe_net[name] = L.Softmax(caffe_net[outputs[bottom]], in_place=True)
+            elif config['activation'] == 'sigmoid':
+                # name_s = name+'s'
+                caffe_net[name] = L.Sigmoid(caffe_net[outputs[bottom]], in_place=True)
             else:
                 raise Exception('Unsupported activation '+config['activation'])
         
